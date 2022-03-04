@@ -21,6 +21,8 @@ GROUP=`stat --printf "%g" $HOME`
 chgrp -R $GROUP ~/.tinyware-wall
 chmod -R gu+rwx ~/.tinyware-wall
 cp -u ~/.tinyware-wall/userules ~/.tinyware-wall/userules.back
+cp -u ~/.tinyware-wall/permitdomains ~/.tinyware-wall/permitdomains.back
+cp -u ~/.tinyware-wall/declinedomains ~/.tinyware-wall/declinedomains.back
 
 $IPTABLES-restore < ~/.tinyware-wall/initstate
 . ~/.tinyware-wall/userules
@@ -55,7 +57,7 @@ do
     fi
     if [ -z "$HSRC" ]
     then
-        HSRC=`host -W 3 $SRC 2>/dev/null | grep "domain name pointer" | awk '{ print $5 }'`
+        HSRC=`host -W 3 $SRC 2>/dev/null | grep "domain name pointer" | head -n 1 | awk '{ print $5 }'`
         [ -n "$HSRC" ] && HSRCFOUND="dns"
     fi
     HSRC=${HSRC:-$SRC}
@@ -71,7 +73,7 @@ do
     fi
     if [ -z "$HDST" ]
     then
-        HDST=`host -W3 $DST 2>/dev/null | grep "domain name pointer" | awk '{ print $5 }'`
+        HDST=`host -W3 $DST 2>/dev/null | grep "domain name pointer" | head -n 1 | awk '{ print $5 }'`
         [ -n "$HDST" ] && HDSTFOUND="dns"
     fi
     HDST=${HDST:-$DST}
@@ -89,21 +91,21 @@ do
     COMMAND=""
     ACTION=""
     RULE=""
-    AUTOMATIC=""
+    AUTOMATIC="manual"
     [ "$?" = "1" ] && continue
     echo "$HDST" | grep -f ~/.tinyware-wall/permitdomains > /dev/null
     if [ "$?" = "0" ]
     then
-        AUTOMATIC="auto"
+        AUTOMATIC="domain"
         ACTION=$"Accept IP"
     fi
     echo "$HDST" | grep -f ~/.tinyware-wall/declinedomains > /dev/null
     if [ "$?" = "0" ]
     then
-        AUTOMATIC="auto"
+        AUTOMATIC="domain"
         ACTION=$"Reject IP"
     fi
-    if [ -z "$AUTOMATIC" ]
+    if [ "$AUTOMATIC" = "manual" ]
     then
         if [ "$UI" = "zenity" ]
         then
@@ -116,7 +118,7 @@ do
     ACTION=${ACTION:0:1}
     COMMAND=""
     DOMAIN=""
-    [ "$ACTION" = $"R" ] && COMMAND="$IPTABLES -A $CHAIN $IPROTO $ISRC $IDST $IDPT -j REJECT --reject-with icmp-admin-prohibited"
+    [ "$ACTION" = $"R" ] && COMMAND="$IPTABLES -A $CHAIN $IPROTO $ISRC $IDST $IDPT -j REJECT"
     [ "$ACTION" = $"A" ] && COMMAND="$IPTABLES -A $CHAIN $IPROTO $ISRC $IDST $IDPT -j ACCEPT"
     [ "$ACTION" = $"P" ] && DOMAIN=`zenity --entry --entry-text "$HDST"`
     [ "$ACTION" = $"D" ] && DOMAIN=`zenity --entry --entry-text "$HDST"`
